@@ -1,6 +1,8 @@
+import argparse
 import json
 import os
 import sys
+from datetime import datetime, timezone
 
 import requests
 from dotenv import load_dotenv
@@ -52,16 +54,17 @@ def get_broadcaster_id(token):
     return data[0]["id"]
 
 
-def fetch_all_clips(token, broadcaster_id):
+def fetch_window(token, broadcaster_id, started_at, ended_at, headers):
+    """Fetch all clips within a single time window using cursor pagination."""
     clips = []
     cursor = None
-    headers = {
-        "Client-ID": CLIENT_ID,
-        "Authorization": f"Bearer {token}",
-    }
-    print(f"Fetching clips for '{BROADCASTER_NAME}'...")
     while True:
-        params = {"broadcaster_id": broadcaster_id, "first": 100}
+        params = {
+            "broadcaster_id": broadcaster_id,
+            "first": 100,
+            "started_at": started_at,
+            "ended_at": ended_at,
+        }
         if cursor:
             params["after"] = cursor
         resp = requests.get("https://api.twitch.tv/helix/clips", params=params, headers=headers)
@@ -72,21 +75,69 @@ def fetch_all_clips(token, broadcaster_id):
         page = body.get("data", [])
         clips.extend(page)
         cursor = body.get("pagination", {}).get("cursor")
-        print(f"  Fetched {len(clips)} clips so far...", end="\r")
         if not cursor or not page:
             break
-    print(f"\nFound {len(clips)} total clips.")
     return clips
 
 
+def month_windows(after_dt, before_dt):
+    """Yield (started_at, ended_at) RFC3339 pairs, one per month."""
+    current = after_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    while current < before_dt:
+        # advance to first day of next month
+        if current.month == 12:
+            next_month = current.replace(year=current.year + 1, month=1)
+        else:
+            next_month = current.replace(month=current.month + 1)
+        window_end = min(next_month, before_dt)
+        yield current.strftime("%Y-%m-%dT%H:%M:%SZ"), window_end.strftime("%Y-%m-%dT%H:%M:%SZ")
+        current = next_month
+
+
+def fetch_all_clips(token, broadcaster_id, after, before):
+    headers = {
+        "Client-ID": CLIENT_ID,
+        "Authorization": f"Bearer {token}",
+    }
+    after_dt = datetime.fromisoformat(after.replace("Z", "+00:00"))
+    before_dt = datetime.fromisoformat(before.replace("Z", "+00:00"))
+
+    print(f"Fetching clips for '{BROADCASTER_NAME}' ({after[:10]} → {before[:10]})...")
+
+    seen_ids = set()
+    all_clips = []
+
+    windows = list(month_windows(after_dt, before_dt))
+    for i, (w_start, w_end) in enumerate(windows, 1):
+        clips = fetch_window(token, broadcaster_id, w_start, w_end, headers)
+        new = [c for c in clips if c["id"] not in seen_ids]
+        seen_ids.update(c["id"] for c in new)
+        all_clips.extend(new)
+        print(f"  [{i}/{len(windows)}] {w_start[:10]} → {w_end[:10]}: {len(clips)} clips ({len(all_clips)} total)")
+
+    print(f"Done. Found {len(all_clips)} total clips.")
+    return all_clips
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--after", metavar="DATE", default="2020-07-01", help="Only fetch clips created after this date (default: 2020-07-01)")
+    parser.add_argument("--before", metavar="DATE", help="Only fetch clips created before this date (e.g. 2022-01-01)")
+    args = parser.parse_args()
+
+    def to_rfc3339(date_str):
+        return date_str if "T" in date_str else f"{date_str}T00:00:00Z"
+
+    after = to_rfc3339(args.after)
+    before = to_rfc3339(args.before) if args.before else datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     validate_config()
     folder = os.path.join(OUTPUT_DIR, BROADCASTER_NAME)
     os.makedirs(folder, exist_ok=True)
 
     token = get_access_token()
     broadcaster_id = get_broadcaster_id(token)
-    clips = fetch_all_clips(token, broadcaster_id)
+    clips = fetch_all_clips(token, broadcaster_id, after=after, before=before)
 
     out_path = os.path.join(folder, "clips.json")
     with open(out_path, "w", encoding="utf-8") as f:

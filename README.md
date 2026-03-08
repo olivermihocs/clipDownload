@@ -50,6 +50,7 @@ Open `.env` and set the following:
 | `TWITCH_BROADCASTER_NAME` | Your Twitch username (lowercase) |
 | `OUTPUT_DIR` | Folder to save clips into (default: `clips`) |
 | `MIN_VIEWS` | Only download clips with at least this many views. Set to `0` to download all. |
+| `KEYWORD` | Only download clips where this keyword appears in the title or creator name (case-insensitive). Leave empty to download all. |
 
 Example `.env`:
 
@@ -59,6 +60,7 @@ TWITCH_CLIENT_SECRET=secretvalue456
 TWITCH_BROADCASTER_NAME=olee___
 OUTPUT_DIR=clips
 MIN_VIEWS=0
+KEYWORD=
 ```
 
 > `.env` is gitignored and will never be committed.
@@ -75,6 +77,19 @@ Connects to the Twitch API and saves all clip metadata to `clips/<username>/clip
 python fetch_clips.py
 ```
 
+Fetches clips from `2020-07-01` to now by default. You can narrow the range with optional arguments:
+
+| Argument | Description |
+|---|---|
+| `--after DATE` | Only fetch clips created after this date (default: `2020-07-01`) |
+| `--before DATE` | Only fetch clips created before this date (default: now) |
+
+```bash
+python fetch_clips.py --after 2021-01-01 --before 2023-01-01
+```
+
+> Internally fetches one calendar month at a time to work around a Twitch API pagination bug that drops date filters on subsequent pages.
+
 Only needs to be run once, or again whenever you want to pick up newly created clips.
 
 ### Step 2 — Download the clips
@@ -88,6 +103,8 @@ python download_clips.py
 - Clips are saved to `clips/<username>/<year>/<date>_<title>.mp4`
 - A metadata sidecar is saved to `clips/<username>/metadata/<date>_<title>.json`
 - Already-downloaded clips are automatically skipped — safe to re-run
+- Set `MIN_VIEWS` in `.env` to skip clips below a view threshold
+- Set `KEYWORD` in `.env` to only download clips whose title or creator name contains that word (case-insensitive)
 
 ---
 

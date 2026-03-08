@@ -12,6 +12,7 @@ load_dotenv()
 BROADCASTER_NAME = os.getenv("TWITCH_BROADCASTER_NAME")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "clips")
 MIN_VIEWS = int(os.getenv("MIN_VIEWS", "0"))
+KEYWORD = os.getenv("KEYWORD", "").strip()
 
 
 def validate_config():
@@ -62,6 +63,11 @@ def main():
     if MIN_VIEWS > 0:
         clips = [c for c in clips if c.get("view_count", 0) >= MIN_VIEWS]
         print(f"Filtered to {len(clips)} clips with {MIN_VIEWS}+ views.")
+
+    if KEYWORD:
+        kw = KEYWORD.lower()
+        clips = [c for c in clips if kw in c.get("title", "").lower() or kw in c.get("creator_name", "").lower()]
+        print(f"Filtered to {len(clips)} clips matching keyword '{KEYWORD}'.")
 
     total = len(clips)
     downloaded = 0
