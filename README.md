@@ -57,7 +57,7 @@ Example `.env`:
 ```
 TWITCH_CLIENT_ID=abc123xyz
 TWITCH_CLIENT_SECRET=secretvalue456
-TWITCH_BROADCASTER_NAME=olee___
+TWITCH_BROADCASTER_NAME=your_twitch_username
 OUTPUT_DIR=clips
 MIN_VIEWS=0
 KEYWORD=
@@ -112,17 +112,17 @@ python download_clips.py
 
 ```
 clips/
-  olee___/
+  your_twitch_username/
     clips.json              <- full clip list from Twitch API
     metadata/
-      2024-01-15_Amazing Play.json
-      2023-08-02_Funny Moment.json
+      2024-03-10_insane clutch.json
+      2023-11-04_1v4 win.json
     2021/
-      2021-01-23_gamer move.mp4
+      2021-06-15_first clip.mp4
     2022/
-      2022-05-20_AA.mp4
+      2022-09-01_legendary play.mp4
     2023/
-      2023-12-10_meta.mp4
+      2023-11-04_1v4 win.mp4
     2024/
-      2024-01-20_nuke.mp4
+      2024-03-10_insane clutch.mp4
 ```
